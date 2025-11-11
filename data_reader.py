@@ -8,8 +8,10 @@ from efficiency import get_efficiency_vectorized
 # --- 1. USER CONFIGURATION ---
 # Set your file and column names here
 
-# The exact (case-sensitive) name of your CSV file
-csv_filename = 'Data-Viewer/COTA_Day.csv'
+# The exact (case-sensitive) name of your CSV 
+csv_filename = 'Data-Viewer/Log__2024_10_13__17_13_04.csv' # UTA fast run
+
+csv_filename = 'Data-Viewer/Log__2025_11_03__10_37_30.csv' # inverter Failure
 
 # (Optional) Define new "math channels" to create from existing columns
 # Use a dictionary where:
@@ -20,7 +22,9 @@ math_channels = {
     'mech_power_kW': '`Actual Torque` * RPM / 9550',
     'Brake Pressure 1': '(`BSE 1 Voltage` - .512) * 3737.5',
     'Throttle Position (%)': '(`APPS Telemetry`) * 100',
-    'electrical_power_kW': '(`Voltage Input into DC` * `Current Input into DC`) / 1000'
+    'electrical_power_kW': '(`Voltage Input into DC` * `Current Input into DC`) / 1000',
+    'Torque Command / 1e16': '`Torque Command` / 1e16',
+    'RPM / 10' : 'RPM / 100'
     #'Efficiency (%)': 'mech_power_kW / electrical_power_kW * 100'
     
 }
@@ -32,7 +36,7 @@ math_channels = {
 filter_channels = {
     'Brake Pressure 1': 20,
     #'Power Delta kW': 10,
-    'electrical_power_kW': 10
+    'electrical_power_kW': 50
 }
 
 
@@ -43,15 +47,26 @@ x_variable = 'Time'
 # You can include your new 'math_channel' names here.
 
 # Driver Analysis
-# y_variables = ['Brake Pressure 1_filtered','Throttle Position (%)']
+#y_variables = ['Throttle Position (%)','electrical_power_kW'] #'Brake Pressure 1_filtered',
 
 # Power Limit Analysis
-y_variables = ['mech_power_est_kW','electrical_power_kW','Torque Limit Nm','Power with Limit kW','Torque Command','Actual Torque','kW Overshoot']#,'Efficiency (%)']
+#y_variables = ['mech_est_power_kW','electrical_power_kW_filtered','Torque Limit Nm','Power with Limit kW','Torque Command','Actual Torque','kW Overshoot', 'efficiency']#,'Efficiency (%)']
+
+# Broken Inverter
+#y_variables = ['electrical_power_kW_filtered','RPM','Torque Command / 1e16','Inverter Torque Request','Throttle Position (%)','Voltage Input into DC']#,'Efficiency (%)']'Torque Command',
+
+# Current Analysis
+y_variables = ['RPM / 10','Current Input into DC','Torque Command / 1e16','Inverter Torque Request', 'Phase A Current','Phase B Current','Phase C Current','AB Voltage','BC Voltage']
+
+# LV?
+y_variables = ['RPM / 10','Motor Angle','Resolver Angle']
+#Temp
+y_variables = ['Inverter Temp','RPM / 10']
 
 # (Optional) Set a start and end value for the X-axis to filter data
 # Set to None to disable filtering
-x_start_value = 75 # e.g., 1000
-x_end_value = 500   # e.g., 5000
+x_start_value = None#115 # e.g., 1000
+x_end_value = None#117   # e.g., 5000
 
 
 # --- 2. DATA PROCESSING AND PLOTTING ---
@@ -91,12 +106,15 @@ try:
     # Manually add complicated channels
     
     powerlimit = 50  # kW
+    safety_margin_kW = 5  # kW
 
-    df['mech_power_est_kW'] = 100 * df['mech_power_kW'] / np.maximum(get_efficiency_vectorized(df['RPM'], df['Inverter Torque Request']),20)
+    df['efficiency'] = np.maximum(get_efficiency_vectorized(df['RPM'], df['Inverter Torque Request']),50)
+
+    df['mech_est_power_kW'] = 100 * df['mech_power_kW'] / df['efficiency'] + safety_margin_kW
     df['Torque Limit Nm'] = np.minimum(9550 * powerlimit / df['RPM'],220)
     df['Power with Limit kW'] = df['RPM'] * df['Torque Limit Nm'] / 9550
 
-    df['kW Overshoot'] = np.minimum(df['mech_power_est_kW'] - df['electrical_power_kW'],0)
+    df['kW Overshoot'] = np.minimum(df['mech_est_power_kW'] - df['electrical_power_kW_filtered'],0)
 
     # Check if all specified plot columns exist (including new math channels)
     all_vars = [x_variable] + y_variables
@@ -129,7 +147,7 @@ try:
         
         # Loop through each y_variable and plot it against the x_variable
         for y_var in y_variables:
-            plt.plot(df[x_variable], df[y_var], label=y_var)
+            plt.scatter(df[x_variable], df[y_var], label=y_var)
 
         # --- 3. CUSTOMIZE PLOT ---
         
