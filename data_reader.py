@@ -61,7 +61,7 @@ y_variables = ['RPM / 10','Current Input into DC','Torque Command / 1e16','Inver
 # LV?
 y_variables = ['RPM / 10','Motor Angle','Resolver Angle']
 #Temp
-y_variables = ['Inverter Temp','RPM / 10']
+y_variables = ['Inverter Temp','RPM / 10','Current Input into DC']
 
 # (Optional) Set a start and end value for the X-axis to filter data
 # Set to None to disable filtering
@@ -147,7 +147,7 @@ try:
         
         # Loop through each y_variable and plot it against the x_variable
         for y_var in y_variables:
-            plt.scatter(df[x_variable], df[y_var], label=y_var)
+            plt.plot(df[x_variable], df[y_var], label=y_var)
 
         # --- 3. CUSTOMIZE PLOT ---
         
